@@ -54,6 +54,125 @@ void delete_rbtree(rbtree *t) {
   free(t);
 }
 
+void left_rotate(rbtree* t, node_t* x)
+{
+  node_t *right = x->right;
+
+  x->right = right->left;
+
+  if (t->nil != right->left)
+  {
+    right->left->parent = x;
+  }
+
+  right->parent = x->parent;
+
+  if (t->nil == x->parent)
+  {
+    t->root = right;
+  }
+  else if (x == x->parent->left)
+  {
+    x->parent->left = right;
+  }
+  else
+  {
+    x->parent->right = right;
+  }
+
+  right->left = x;
+  x->parent = right;
+}
+
+void right_rotate(rbtree* t, node_t* y)
+{
+  node_t *left = y->left;
+
+  y->left = left->right;
+
+  if (t->nil != left->right)
+  {
+    left->right->parent = y;
+  }
+
+  left->parent = y->parent;
+
+  if (t->nil == y->parent)
+  {
+    t->root = left;
+  }
+  else if (y == y->parent->left)
+  {
+    y->parent->left = left;
+  }
+  else
+  {
+    y->parent->right = left;
+  }
+
+  left->right = y;
+  y->parent = left;
+}
+
+void insert_fix(rbtree* t, node_t* insert_node)
+{
+  node_t *brother = NULL;
+
+  while ((t->nil != insert_node->parent) && (RBTREE_RED == insert_node->parent->color))
+  {
+    if (insert_node->parent == insert_node->parent->parent->left)
+    {
+      brother = insert_node->parent->parent->right;
+
+      if (RBTREE_RED == brother->color)
+      {
+        insert_node->parent->color = RBTREE_BLACK;
+        brother->color = RBTREE_BLACK;
+        insert_node->parent->parent->color = RBTREE_RED;
+        insert_node = insert_node->parent->parent;
+      }
+      else
+      {
+        if (insert_node == insert_node->parent->right)
+        {
+          insert_node = insert_node->parent;
+          left_rotate(t, insert_node);
+        }
+
+        insert_node->parent->color = RBTREE_BLACK;
+        insert_node->parent->parent->color = RBTREE_RED;
+        right_rotate(t, insert_node->parent->parent);
+      }
+    }
+    else
+    {
+      brother = insert_node->parent->parent->left;
+
+      if (RBTREE_RED == brother->color)
+      {
+        insert_node->parent->color = RBTREE_BLACK;
+        brother->color = RBTREE_BLACK;
+        insert_node->parent->parent->color = RBTREE_RED;
+        insert_node = insert_node->parent->parent;
+      }
+      else
+      {
+        if (insert_node == insert_node->parent->left)
+        {
+          insert_node = insert_node->parent;
+          right_rotate(t, insert_node);
+        }
+
+        insert_node->parent->color = RBTREE_BLACK;
+        insert_node->parent->parent->color = RBTREE_RED;
+        left_rotate(t, insert_node->parent->parent);
+      }
+    }
+  }
+
+  t->root->color = RBTREE_BLACK;
+}
+
 node_t *rbtree_insert(rbtree *t, const key_t key) {
   // TODO: implement insert
   if (NULL == t)
@@ -61,9 +180,45 @@ node_t *rbtree_insert(rbtree *t, const key_t key) {
     return NULL;
   }
 
-  
+  node_t *cur = t->root, *pre = t->nil;
+  node_t* insert_node = (node_t*)calloc(1, sizeof(node_t));
 
-  return t->root;
+  while (t->nil != cur)
+  {
+    pre = cur;
+
+    if (key <= cur->key)
+    {
+      cur = cur->left;
+    }
+    else
+    {
+      cur = cur->right;
+    }
+  }
+  
+  insert_node->parent = pre;
+
+  if (t->nil == pre)
+  {
+    t->root = insert_node;
+  }
+  else if (key <= pre->key)
+  {
+    pre->left = insert_node;
+  }
+  else
+  {
+    pre->right = insert_node;
+  }
+
+  insert_node->color = RBTREE_RED;
+  insert_node->key = key;
+  insert_node->left = insert_node->right = t->nil;
+
+  insert_fix(t, insert_node);
+
+  return insert_node;
 }
 
 node_t* search_key(const node_t* cur, const node_t* nil, const key_t key)
