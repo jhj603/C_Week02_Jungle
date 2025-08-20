@@ -406,6 +406,10 @@ void test_find_erase_rand(const size_t n, const unsigned int seed)
     arr[i] = rand();
   }
 
+  for (int i = 0; i < n; ++i)
+    printf("%d ", arr[i]);
+  printf("\n");
+
   test_find_erase(t, arr, n);
 
   free(arr);

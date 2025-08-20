@@ -1,6 +1,6 @@
 .PHONY: clean
 
-CFLAGS=-Wall -g #-DSENTINEL
+CFLAGS=-Wall -g -DSENTINEL
 
 driver: driver.o rbtree.o
 

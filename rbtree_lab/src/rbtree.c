@@ -28,7 +28,7 @@ rbtree *new_rbtree(void) {
   return p;
 }
 
-void delete_tree_node(node_t* cur, node_t* nil)
+static void delete_tree_node(node_t* cur, node_t* nil)
 {
   if (cur == nil)
   {
@@ -54,7 +54,7 @@ void delete_rbtree(rbtree *t) {
   free(t);
 }
 
-void left_rotate(rbtree* t, node_t* x)
+static void left_rotate(rbtree* t, node_t* x)
 {
   node_t *right = x->right;
 
@@ -84,7 +84,7 @@ void left_rotate(rbtree* t, node_t* x)
   x->parent = right;
 }
 
-void right_rotate(rbtree* t, node_t* y)
+static void right_rotate(rbtree* t, node_t* y)
 {
   node_t *left = y->left;
 
@@ -114,7 +114,7 @@ void right_rotate(rbtree* t, node_t* y)
   y->parent = left;
 }
 
-void insert_fix(rbtree* t, node_t* insert_node)
+static void insert_fix(rbtree* t, node_t* insert_node)
 {
   node_t *brother = NULL;
 
@@ -124,7 +124,7 @@ void insert_fix(rbtree* t, node_t* insert_node)
     {
       brother = insert_node->parent->parent->right;
 
-      if (RBTREE_RED == brother->color)
+      if ((t->nil != brother) && (RBTREE_RED == brother->color))
       {
         insert_node->parent->color = RBTREE_BLACK;
         brother->color = RBTREE_BLACK;
@@ -148,7 +148,7 @@ void insert_fix(rbtree* t, node_t* insert_node)
     {
       brother = insert_node->parent->parent->left;
 
-      if (RBTREE_RED == brother->color)
+      if ((t->nil != brother) && (RBTREE_RED == brother->color))
       {
         insert_node->parent->color = RBTREE_BLACK;
         brother->color = RBTREE_BLACK;
@@ -183,6 +183,10 @@ node_t *rbtree_insert(rbtree *t, const key_t key) {
   node_t *cur = t->root, *pre = t->nil;
   node_t* insert_node = (node_t*)calloc(1, sizeof(node_t));
 
+  insert_node->color = RBTREE_RED;
+  insert_node->key = key;
+  insert_node->left = insert_node->right = t->nil;
+
   while (t->nil != cur)
   {
     pre = cur;
@@ -212,34 +216,9 @@ node_t *rbtree_insert(rbtree *t, const key_t key) {
     pre->right = insert_node;
   }
 
-  insert_node->color = RBTREE_RED;
-  insert_node->key = key;
-  insert_node->left = insert_node->right = t->nil;
-
   insert_fix(t, insert_node);
 
   return insert_node;
-}
-
-node_t* search_key(const node_t* cur, const node_t* nil, const key_t key)
-{
-  if (cur == nil)
-  {
-    return NULL;
-  }
-
-  if (cur->key == key)
-  {
-    return cur;
-  }
-  else if (cur->key > key)
-  {
-    return search_key(cur->left, nil, key);
-  }
-  else
-  {
-    return search_key(cur->right, nil, key);
-  }
 }
 
 node_t *rbtree_find(const rbtree *t, const key_t key) {
@@ -249,29 +228,309 @@ node_t *rbtree_find(const rbtree *t, const key_t key) {
     return NULL;
   }
   
-  node_t* search = search_key(t->root, t->nil, key);
+  node_t* cur = t->root;
 
-  return search;
+  while (t->nil != cur)
+  {
+    if (key == cur->key)
+    {
+      break;
+    }
+    else if (key <= cur->key)
+    {
+      cur = cur->left;
+    }
+    else
+    {
+      cur = cur->right;
+    }
+  }
+
+  if (t->nil == cur)
+    cur = NULL;
+
+  return cur;
 }
 
 node_t *rbtree_min(const rbtree *t) {
   // TODO: implement find
-  return t->root;
+  if (NULL == t)
+  {
+    return NULL;
+  }
+    
+  node_t *cur = t->root;
+
+  while (t->nil != cur->left)
+  {
+    cur = cur->left;
+  }
+
+  return cur;
 }
 
 node_t *rbtree_max(const rbtree *t) {
   // TODO: implement find
-  return t->root;
+  if (NULL == t)
+  {
+    return NULL;
+  }
+  
+  node_t *cur = t->root;
+
+  while (t->nil != cur->right)
+  {
+    cur = cur->right;
+  }
+
+  return cur;
+}
+
+static void transplant(rbtree* t, node_t* u, node_t* v)
+{
+  if (t->nil == u->parent)
+  {
+    t->root = v;
+  }
+  else if (u == u->parent->left)
+  {
+    u->parent->left = v;
+  }
+  else
+  {
+    u->parent->right = v;
+  }
+
+  if (NULL != v)
+    v->parent = u->parent;
+}
+
+static node_t* rbtree_successor(const rbtree* t, node_t* cur)
+{
+  node_t *x = cur->right;
+
+  if (t->nil != x)
+  {
+    while (t->nil != x->left)
+    {
+      x = x->left;
+    }    
+  }
+
+  return x;
+}
+
+static void erase_fix(rbtree* t, node_t* replace_node)
+{
+  while ((t->root != replace_node) && (RBTREE_BLACK == replace_node->color))
+  {
+    if (replace_node == replace_node->parent->left)
+    {
+      node_t* brother = replace_node->parent->right;
+      
+      if (RBTREE_RED == brother->color)
+      {
+        brother->color = RBTREE_BLACK;
+        replace_node->parent->color = RBTREE_RED;
+
+        left_rotate(t, replace_node->parent);
+
+        brother = replace_node->parent->right;
+      }
+      if ((RBTREE_BLACK == brother->left->color) && (RBTREE_BLACK == brother->right->color))
+      {
+        brother->color = RBTREE_RED;
+        replace_node = replace_node->parent;
+      }
+      else
+      {
+        if (RBTREE_BLACK == brother->right->color)
+        {
+          brother->left->color = RBTREE_BLACK;
+          brother->color = RBTREE_RED;
+
+          right_rotate(t, brother);
+
+          brother = replace_node->parent->right;
+        }
+        
+        brother->color = replace_node->parent->color;
+        replace_node->parent->color = RBTREE_BLACK;
+
+        brother->right->color = RBTREE_BLACK;
+
+        left_rotate(t, replace_node->parent);
+
+        replace_node = t->root;
+      } 
+    }
+    else
+    {
+      node_t* brother = replace_node->parent->left;
+
+      if (RBTREE_RED == brother->color)
+      {
+        brother->color = RBTREE_BLACK;
+        replace_node->parent->color = RBTREE_RED;
+
+        right_rotate(t, replace_node->parent);
+
+        brother = replace_node->parent->left;
+      }
+      if ((RBTREE_BLACK == brother->left->color) && (RBTREE_BLACK == brother->right->color))
+      {
+        brother->color = RBTREE_RED;
+        replace_node = replace_node->parent;
+      }
+      else
+      {
+        if (RBTREE_BLACK == brother->left->color)
+        {
+          brother->right->color = RBTREE_BLACK;
+
+          brother->color = RBTREE_RED;
+
+          left_rotate(t, brother);
+
+          brother = replace_node->parent->left;
+        }
+
+        brother->color = replace_node->parent->color;
+        replace_node->parent->color = RBTREE_BLACK;
+
+        brother->left->color = RBTREE_BLACK;
+        
+        right_rotate(t, replace_node->parent);
+
+        replace_node = t->root;
+      }
+    }
+  }
+
+  if (t->nil != replace_node)
+  {
+    replace_node->color = RBTREE_BLACK;
+  }
 }
 
 int rbtree_erase(rbtree *t, node_t *p) {
   // TODO: implement erase
+  if ((NULL == t) || (NULL == p))
+  {
+    return 1;
+  }
+  
+  node_t *subtree = t->nil, *erase_node = p;
+  color_t erase_color = erase_node->color;
+
+  if (t->nil == p->left)
+  {
+    subtree = p->right;
+
+    transplant(t, p, p->right);
+  }
+  else if (t->nil == p->right)
+  {
+    subtree = p->left;
+
+    transplant(t, p, p->left);
+  }
+  else
+  {
+    erase_node = rbtree_successor(t, p);
+    erase_color = erase_node->color;
+
+    subtree = erase_node->right;
+
+    if (p == erase_node->parent)
+    {
+      subtree->parent = erase_node;
+    }
+    else
+    {
+      transplant(t, erase_node, erase_node->right);
+      erase_node->right = p->right;
+      erase_node->right->parent = erase_node;
+    }
+
+    transplant(t, p, erase_node);
+
+    erase_node->left = p->left;
+    erase_node->left->parent = erase_node;
+    erase_node->color = p->color;
+  }
+
+  if (RBTREE_BLACK == erase_color)
+  {
+    erase_fix(t, subtree);
+  }
+
+  free(p);
+
   return 0;
 }
 
 int rbtree_to_array(const rbtree *t, key_t *arr, const size_t n) {
   // TODO: implement to_array
+  if (t->nil == t->root)
+  {
+    return 0;
+  }
 
+  int cur_count = 0;
+  node_t *pre = t->nil, *cur = t->root;
 
+  while (t->nil != cur)
+  {
+    if (cur_count >= n)
+    {
+      break;
+    }
+    
+    if (pre == cur->parent)
+    {
+      if (t->nil != cur->left)
+      {
+        pre = cur;
+        cur = cur->left;
+      }
+      else
+      {
+        arr[cur_count++] = cur->key;
+
+        pre = cur;
+
+        if (t->nil != cur->right)
+        {
+          cur = cur->right;
+        }
+        else
+        {
+          cur = cur->parent;
+        }
+      }
+    }
+    else if (pre == cur->left)
+    {
+      arr[cur_count++] = cur->key;
+
+      pre = cur;
+
+      if (t->nil != cur->right)
+      {
+        cur = cur->right;
+      }
+      else
+      {
+        cur = cur->parent;
+      }
+    }
+    else
+    {
+      pre = cur;
+      cur = cur->parent;
+    }
+  }
+  
   return 0;
 }
